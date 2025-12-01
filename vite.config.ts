@@ -16,7 +16,7 @@ export default defineConfig(() => {
     },
     define: {
       // Hardcoded key to bypass Vercel env var issues
-      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify("AIzaSyAbV2AZm9kBX1vNfr3O7s-bzfByD7hhOP2"),
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify("AIzaSyAbV2AZm9kBX1vNfr3O7s-bzfByD7hhOP2A"),
     },
   };
 });
