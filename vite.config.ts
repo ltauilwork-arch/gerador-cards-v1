@@ -6,6 +6,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "");
   console.log("---------------------------------------------------");
   console.log("BUILD DEBUG: VITE_GEMINI_API_KEY from process.env:", process.env.VITE_GEMINI_API_KEY ? "PRESENT" : "MISSING");
+  console.log("BUILD DEBUG: All Env Keys:", Object.keys(process.env).filter(k => k.startsWith("VITE_") || k.includes("GEMINI")));
   console.log("BUILD DEBUG: VITE_GEMINI_API_KEY from loadEnv:", env.VITE_GEMINI_API_KEY ? "PRESENT" : "MISSING");
   console.log("---------------------------------------------------");
   return {
