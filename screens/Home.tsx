@@ -7,7 +7,7 @@ interface HomeProps {
 
 export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  console.log("Client Debug - API_KEY (v2):", apiKey);
+  // console.log("Client Debug - API_KEY:", apiKey);
   return (
     <div className="flex flex-col flex-1 bg-white">
       <div className="flex items-center bg-white p-4 pb-2 justify-between">
