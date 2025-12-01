@@ -4,6 +4,7 @@ import PptxGenJS from "pptxgenjs";
 
 export const generatePresentationData = async (text: string): Promise<PresentationData> => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  console.log("GeminiService - Using API Key:", apiKey);
   console.log("GeminiService - API Key present:", !!apiKey);
   if (!apiKey) {
     throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env.local.");
