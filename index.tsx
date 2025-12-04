@@ -85,6 +85,8 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
       const roteiros = files.filter(f => f.name.includes("_01_ROTEIRO_"));
       const cards = files.filter(f => f.name.includes("_02_CARD_"));
       
+      // Build set of valid roteiro keys
+      const roteiroKeys = new Set<string>();
       const itemMap = new Map<string, DashboardItem>();
       
       roteiros.forEach(roteiro => {
@@ -94,6 +96,7 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
           const themePart = parts[1].replace(/\.[^/.]+$/, "");
           const key = datePart + themePart;
           
+          roteiroKeys.add(key);
           itemMap.set(key, {
             key,
             theme: themePart,
@@ -104,6 +107,10 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
         }
       });
       
+      // Process cards and identify orphans and outdated cards
+      const orphanCards: DriveFile[] = [];
+      const outdatedCards: DriveFile[] = [];
+      
       cards.forEach(card => {
         const parts = card.name.split("_02_CARD_");
         if (parts.length === 2) {
@@ -111,13 +118,55 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
           const themePart = parts[1].replace(/\.[^/.]+$/, "");
           const key = datePart + themePart;
           
-          if (itemMap.has(key)) {
+          if (roteiroKeys.has(key)) {
+            // Card has a matching roteiro
             const item = itemMap.get(key)!;
-            item.card = card;
-            item.status = "done";
+            
+            // Check if roteiro is more recent than card (card is outdated)
+            const roteiroDate = new Date(item.roteiro!.modifiedTime);
+            const cardDate = new Date(card.modifiedTime);
+            
+            if (roteiroDate > cardDate) {
+              // Roteiro was updated after card was created - card is outdated
+              console.log(`📅 Card desatualizado detectado: ${card.name}`);
+              console.log(`   Roteiro: ${roteiroDate.toLocaleString()} | Card: ${cardDate.toLocaleString()}`);
+              outdatedCards.push(card);
+              // Don't associate the outdated card with the item
+            } else {
+              // Card is up to date
+              item.card = card;
+              item.status = "done";
+            }
+          } else {
+            // Orphan card - no matching roteiro
+            orphanCards.push(card);
           }
         }
       });
+      
+      // Delete orphan and outdated cards from Drive
+      const cardsToDelete = [...orphanCards, ...outdatedCards];
+      if (cardsToDelete.length > 0) {
+        console.log(`🗑️ Encontrados ${cardsToDelete.length} card(s) para excluir (${orphanCards.length} órfão(s), ${outdatedCards.length} desatualizado(s))...`);
+        for (const cardToDelete of cardsToDelete) {
+          try {
+            await fetch(
+              `https://www.googleapis.com/drive/v3/files/${cardToDelete.id}`,
+              {
+                method: "PATCH",
+                headers: { 
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ trashed: true }),
+              }
+            );
+            console.log(`✅ Card excluído: ${cardToDelete.name}`);
+          } catch (err) {
+            console.error(`❌ Erro ao excluir card: ${cardToDelete.name}`, err);
+          }
+        }
+      }
       
       const sortedItems = Array.from(itemMap.values()).sort((a, b) => b.key.localeCompare(a.key));
       setItems(sortedItems);
@@ -202,7 +251,44 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
       setStatusMessage("Criando PPTX...");
       const pptxBlob = await generatePptx(presentationData);
       
-      // 3. Upload to Drive
+      // 3. Delete existing card if regenerating
+      if (item.card) {
+        setStatusMessage("Excluindo versão anterior...");
+        try {
+          // Try permanent delete first
+          const deleteResponse = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${item.card.id}`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${accessToken}` },
+            }
+          );
+          
+          if (!deleteResponse.ok) {
+            // If delete fails, try moving to trash
+            const trashResponse = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${item.card.id}`,
+              {
+                method: "PATCH",
+                headers: { 
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ trashed: true }),
+              }
+            );
+            
+            if (!trashResponse.ok) {
+              const errorText = await trashResponse.text();
+              console.error("Falha ao excluir card:", errorText);
+            }
+          }
+        } catch (deleteError) {
+          console.error("Erro ao excluir card anterior:", deleteError);
+        }
+      }
+      
+      // 4. Upload new card to Drive
       setStatusMessage("Enviando para o Drive...");
       const fileName = `${item.key.substring(0, 8)}_02_CARD_${item.theme}.pptx`;
       
