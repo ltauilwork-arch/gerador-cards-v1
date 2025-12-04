@@ -270,12 +270,14 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
       
       <main className="flex-1 p-8 overflow-hidden flex flex-col">
         <div className="bg-white rounded-xl shadow border border-gray-200 flex flex-col flex-1 overflow-hidden">
-          <div className="grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50 font-semibold text-sm text-gray-600">
-            <div className="col-span-1 text-center">Status</div>
-            <div className="col-span-5">Roteiro</div>
-            <div className="col-span-2">Data</div>
-            <div className="col-span-1 text-center">Card</div>
-            <div className="col-span-3 text-right">Ação</div>
+          <div className="grid gap-4 p-4 border-b border-gray-100 bg-gray-50 font-semibold text-sm text-gray-600" style={{gridTemplateColumns: "0.5fr 4fr 1.5fr 0.5fr 1.5fr 2fr 3fr"}}>
+            <div className="text-center">Status</div>
+            <div>Roteiro</div>
+            <div>Data Roteiro</div>
+            <div className="text-center">Card</div>
+            <div>Data Card</div>
+            <div className="text-center">Ação</div>
+            <div className="text-center">Download / Compartilhar</div>
           </div>
           
           <div className="overflow-y-auto flex-1">
@@ -299,17 +301,21 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
               </div>
             ) : (
               items.map(item => (
-                <div key={item.key} className="grid grid-cols-12 gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors text-sm">
-                  <div className="col-span-1 flex justify-center">
+                <div key={item.key} className="grid gap-4 p-4 border-b border-gray-100 items-center hover:bg-gray-50 transition-colors text-sm" style={{gridTemplateColumns: "0.5fr 4fr 1.5fr 0.5fr 1.5fr 2fr 3fr"}}>
+                  {/* Status */}
+                  <div className="flex justify-center">
                     <div className={`w-3 h-3 rounded-full ${item.status === 'done' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                   </div>
-                  <div className="col-span-5 font-medium text-gray-900 truncate" title={item.roteiro?.name}>
+                  {/* Roteiro */}
+                  <div className="font-medium text-gray-900 truncate" title={item.roteiro?.name}>
                     {item.roteiro?.name}
                   </div>
-                  <div className="col-span-2 text-gray-500">
+                  {/* Data Roteiro */}
+                  <div className="text-gray-500 text-xs">
                     {item.roteiro?.modifiedTime ? new Date(item.roteiro.modifiedTime).toLocaleDateString() : "-"}
                   </div>
-                  <div className="col-span-1 flex justify-center">
+                  {/* Card indicator */}
+                  <div className="flex justify-center">
                     {item.card ? (
                       <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -320,7 +326,12 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
                       </svg>
                     )}
                   </div>
-                  <div className="col-span-3 flex justify-end">
+                  {/* Data Card */}
+                  <div className="text-gray-500 text-xs">
+                    {item.card?.modifiedTime ? new Date(item.card.modifiedTime).toLocaleDateString() : "-"}
+                  </div>
+                  {/* Ação */}
+                  <div className="flex justify-center">
                     <button
                       onClick={() => handleGenerate(item)}
                       disabled={!!processingKey}
@@ -333,10 +344,46 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
                       {processingKey === item.key ? (
                         <span className="flex items-center gap-2">
                           <span className="animate-spin h-3 w-3 border-b-2 border-gray-400 rounded-full"></span>
-                          {statusMessage || "Processando..."}
+                          {statusMessage || "..."}
                         </span>
                       ) : item.card ? "Regerar" : "Gerar Card"}
                     </button>
+                  </div>
+                  {/* Download / Compartilhar */}
+                  <div className="flex justify-center gap-2">
+                    {item.card ? (
+                      <>
+                        <a
+                          href={`https://drive.google.com/uc?export=download&id=${item.card.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                          title="Baixar arquivo"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download
+                        </a>
+                        <button
+                          onClick={() => {
+                            const link = `https://drive.google.com/file/d/${item.card!.id}/view?usp=sharing`;
+                            navigator.clipboard.writeText(link).then(() => {
+                              alert("✅ Link copiado!\n\n" + link);
+                            });
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
+                          title="Copiar link para compartilhar"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copiar Link
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
                   </div>
                 </div>
               ))
