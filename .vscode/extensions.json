@@ -1,0 +1,21 @@
+{
+  "recommendations": [
+    // TypeScript e React
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    // React específico
+    "dsznajder.es7-react-js-snippets",
+    // Git
+    "eamodio.gitlens",
+    // Utilitários
+    "christian-kohler.path-intellisense",
+    "formulahendry.auto-rename-tag",
+    "naumovs.color-highlight",
+    // Desenvolvimento
+    "usernamehw.errorlens",
+    "wayou.vscode-todo-highlight",
+    // Vite
+    "antfu.vite"
+  ]
+}
