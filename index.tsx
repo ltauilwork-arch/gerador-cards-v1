@@ -332,7 +332,18 @@ const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLogout: (
       <header className="bg-white shadow-sm px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="bg-blue-600 text-white p-2 rounded-lg font-bold">GC</div>
-          <h1 className="text-xl font-bold text-gray-800">Gerador de Cards</h1>
+          <a 
+            href={`https://drive.google.com/drive/folders/${TARGET_FOLDER_ID}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xl font-bold text-gray-800 hover:text-blue-600 transition-colors"
+            title="Abrir pasta no Google Drive"
+          >
+            Gerador de Cards
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
         </div>
         <div className="flex items-center gap-4">
           <button 
