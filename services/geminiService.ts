@@ -1,71 +1,128 @@
+import { GoogleGenAI, Type } from "@google/genai";
 import { PresentationData } from "../types";
 import PptxGenJS from "pptxgenjs";
 
 export const generatePresentationData = async (text: string): Promise<PresentationData> => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  console.log("GeminiService - Using API Key:", apiKey);
+  console.log("GeminiService - API Key present:", !!apiKey);
   if (!apiKey) {
     throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env.local.");
   }
 
+  const ai = new GoogleGenAI({ apiKey });
+
+  // Structure definition based on "PADRÃO PARA CRIAÇÃO DE APRESENTAÇÕES DE ROTEIRO - CASAL NOTARIAL"
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      cover: {
+        type: Type.OBJECT,
+        properties: {
+          guestName: { type: Type.STRING },
+          area: { type: Type.STRING },
+          theme: { type: Type.STRING },
+          instagram: { type: Type.STRING },
+          linkedin: { type: Type.STRING },
+          title: { type: Type.STRING },
+          duration: { type: Type.STRING, description: "e.g. 60 min" },
+          guestDescription: { type: Type.STRING },
+          centralGoal: { type: Type.STRING },
+        },
+        required: [
+          "guestName",
+          "area",
+          "theme",
+          "instagram",
+          "title",
+          "duration",
+          "guestDescription",
+          "centralGoal",
+        ],
+      },
+      opening: {
+        type: Type.OBJECT,
+        properties: {
+          points: { type: Type.ARRAY, items: { type: Type.STRING } },
+          hook: { type: Type.STRING },
+          cta: { type: Type.STRING },
+        },
+        required: ["points", "hook", "cta"],
+      },
+      // We expect exactly 8 blocks for 1-8
+      blocks: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            objective: { type: Type.STRING },
+            questions: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description:
+                "LISTA EXAUSTIVA DE TODAS AS PERGUNTAS DO BLOCO. NÃO OMITA NENHUMA. SE HOUVER 15 PERGUNTAS, RETORNE AS 15.",
+            },
+          },
+          required: ["title", "objective", "questions"],
+        },
+      },
+      finalQuestion: {
+        type: Type.OBJECT,
+        properties: {
+          question: { type: Type.STRING },
+        },
+        required: ["question"],
+      },
+      closing: {
+        type: Type.OBJECT,
+        properties: {
+          recapPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+          ctaPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["recapPoints", "ctaPoints"],
+      },
+    },
+    required: ["cover", "opening", "blocks", "finalQuestion", "closing"],
+  };
+
   try {
-    // Use direct REST API call instead of library to avoid potential auth issues
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    
-    const systemPrompt = `
-    ATENÇÃO: VOCÊ É UM EXTRACTOR DE DADOS, NÃO UM RESUMIDOR.
-    
-    TAREFA: Converter o roteiro fornecido em JSON estruturado para slides.
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: `Roteiro Completo:
+      ${text.substring(0, 500000)}`,
+      config: {
+        systemInstruction: `
+        ATENÇÃO: VOCÊ É UM EXTRACTOR DE DADOS, NÃO UM RESUMIDOR.
+        
+        TAREFA: Converter o roteiro fornecido em JSON estruturado para slides.
 
-    REGRA DE OURO (CRÍTICA):
-    O usuário reclamou que você está truncando as listas de perguntas.
-    - Você DEVE extrair TODAS as perguntas de cada bloco.
-    - Se um bloco tem 15 perguntas, o array JSON deve ter 15 strings.
-    - NÃO selecione apenas as 3 melhores.
-    - NÃO pare de ler o bloco até encontrar o título do próximo.
-    - Copie o texto EXATAMENTE como está no roteiro (verbatim).
-    - NUNCA, EM HIPÓTESE ALGUMA, retorne "CONTEÚDO DE PERGUNTA AUSENTE". Se não encontrar, deixe a string vazia ou tente inferir do contexto, mas NÃO use placeholders de erro.
-    - O texto de entrada pode vir de um DOCX processado, então pode ter formatação estranha. Tente o seu melhor para extrair o conteúdo real.
-    
-    ESTRUTURA DE SAÍDA ESPERADA (JSON):
-    {
-      "cover": { "guestName": "", "area": "", "theme": "", "instagram": "", "linkedin": "", "title": "", "duration": "", "guestDescription": "", "centralGoal": "" },
-      "opening": { "points": [], "hook": "", "cta": "" },
-      "blocks": [{ "title": "", "objective": "", "questions": [] }],
-      "finalQuestion": { "question": "" },
-      "closing": { "recapPoints": [], "ctaPoints": [] }
-    }
+        REGRA DE OURO (CRÍTICA):
+        O usuário reclamou que você está truncando as listas de perguntas.
+        - Você DEVE extrair TODAS as perguntas de cada bloco.
+        - Se um bloco tem 15 perguntas, o array JSON deve ter 15 strings.
+        - NÃO selecione apenas as 3 melhores.
+        - NÃO pare de ler o bloco até encontrar o título do próximo.
+        - Copie o texto EXATAMENTE como está no roteiro (verbatim).
+        - NUNCA, EM HIPÓTESE ALGUMA, retorne "CONTEÚDO DE PERGUNTA AUSENTE". Se não encontrar, deixe a string vazia ou tente inferir do contexto, mas NÃO use placeholders de erro.
+        - O texto de entrada pode vir de um DOCX processado, então pode ter formatação estranha. Tente o seu melhor para extrair o conteúdo real.
+        
+        ESTRUTURA DE SAÍDA ESPERADA:
+        1. Capa (Dados do convidado)
+        2. Abertura (Pontos, Gancho, CTA)
+        3. 8 Blocos de conteúdo (Extraia todas as perguntas de cada seção. Se o roteiro não tiver divisões claras, divida o conteúdo total em 8 partes lógicas)
+        4. Pergunta Final (Ponto de Ouro)
+        5. Encerramento (Recap e CTAs)
 
-    Verifique contagens: Se você extraiu menos de 5 perguntas em um bloco principal, verifique se não esqueceu conteúdo.
-    IMPORTANTE: Retorne APENAS o JSON válido, sem markdown, sem explicações.
-    `;
-    
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: systemPrompt + "\n\nRoteiro Completo:\n" + text.substring(0, 100000) }
-          ]
-        }
-      ],
-      generationConfig: {
-        responseMimeType: "application/json"
-      }
-    };
-    
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
+        Verifique contagens: Se você extraiu menos de 5 perguntas em um bloco principal, verifique se não esqueceu conteúdo.
+        IMPORTANTE: Se o JSON for inválido, o sistema falhará. Certifique-se de fechar todas as chaves e aspas.
+        `,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+      },
     });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Gemini API Error:", errorData);
-      throw new Error(JSON.stringify(errorData));
-    }
-    
-    const result = await response.json();
-    const output = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    const output = response.text;
     if (!output) throw new Error("No response from AI");
 
     // Clean up markdown code blocks if present
@@ -267,7 +324,9 @@ export const generatePptx = async (data: PresentationData): Promise<Blob> => {
   const openRows = data.opening.points.map((p, i) => [
     { text: `${i + 1}. ${p}`, options: { fontSize: 14 } },
   ]);
-  s2.addTable(openRows, { x: 0.5, y: 1, w: 9, border: { type: "none" }, color: GRAY_TEXT });
+  if (openRows.length > 0) {
+    s2.addTable(openRows, { x: 0.5, y: 1, w: 9, border: { type: "none" }, color: GRAY_TEXT });
+  }
 
   // Hook with border look
   s2.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.2, w: 9, h: 0.8, fill: { color: "F9FAFB" } }); // Light gray bg
@@ -355,13 +414,15 @@ export const generatePptx = async (data: PresentationData): Promise<Blob> => {
         { text: q, options: { fontSize: 11, color: GRAY_TEXT } },
       ]);
 
-      slide.addTable(qRows, {
-        x: 0.5,
-        y: 1.9,
-        w: 9,
-        border: { type: "none" },
-        colW: [0.3, 8.7],
-      });
+      if (qRows.length > 0) {
+        slide.addTable(qRows, {
+          x: 0.5,
+          y: 1.9,
+          w: 9,
+          border: { type: "none" },
+          colW: [0.3, 8.7],
+        });
+      }
     }
   });
 
@@ -421,7 +482,9 @@ export const generatePptx = async (data: PresentationData): Promise<Blob> => {
   const recapRows = data.closing.recapPoints.map((p) => [
     { text: `🎙️ ${p}`, options: { fontSize: 12 } },
   ]);
-  s12.addTable(recapRows, { x: 0.5, y: 1.6, w: 9, border: { type: "none" }, color: GRAY_TEXT });
+  if (recapRows.length > 0) {
+    s12.addTable(recapRows, { x: 0.5, y: 1.6, w: 9, border: { type: "none" }, color: GRAY_TEXT });
+  }
 
   s12.addText("CTAs", { x: 0.5, y: 3.5, fontSize: 16, color: BLUE, bold: true });
   s12.addShape(pres.ShapeType.line, {
@@ -437,7 +500,9 @@ export const generatePptx = async (data: PresentationData): Promise<Blob> => {
   const ctaRows = data.closing.ctaPoints.map((p) => [
     { text: `📲 ${p}`, options: { fontSize: 12 } },
   ]);
-  s12.addTable(ctaRows, { x: 0.6, y: 4.1, w: 8.8, border: { type: "none" }, color: GRAY_TEXT });
+  if (ctaRows.length > 0) {
+    s12.addTable(ctaRows, { x: 0.6, y: 4.1, w: 8.8, border: { type: "none" }, color: GRAY_TEXT });
+  }
 
   const base64 = (await pres.write({ outputType: "base64" })) as string;
   const binaryString = atob(base64);

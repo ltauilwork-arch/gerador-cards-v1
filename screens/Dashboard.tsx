@@ -10,6 +10,22 @@ interface DriveFile {
   modifiedTime: string;
 }
 
+interface GoogleDocContent {
+  paragraph?: {
+    elements?: Array<{
+      textRun?: {
+        content?: string;
+      };
+    }>;
+  };
+}
+
+interface GoogleDoc {
+  body?: {
+    content?: GoogleDocContent[];
+  };
+}
+
 interface DashboardItem {
   key: string;
   theme: string;
@@ -59,8 +75,8 @@ export const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLo
         const parts = roteiro.name.split("_01_ROTEIRO_");
         if (parts.length === 2) {
           const datePart = parts[0];
-          const themePart = parts[1].replace(/\.[^/.]+$/, "");
-          const key = datePart + themePart;
+          const themePart = parts[1].replace(/\.[^/.]+$/, "").trim();
+          const key = (datePart + themePart).trim();
           
           roteiroKeys.add(key);
           itemMap.set(key, {
@@ -81,8 +97,8 @@ export const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLo
         const parts = card.name.split("_02_CARD_");
         if (parts.length === 2) {
           const datePart = parts[0];
-          const themePart = parts[1].replace(/\.[^/.]+$/, "");
-          const key = datePart + themePart;
+          const themePart = parts[1].replace(/\.[^/.]+$/, "").trim();
+          const key = (datePart + themePart).trim();
           
           if (roteiroKeys.has(key)) {
             // Card has a matching roteiro
@@ -110,28 +126,10 @@ export const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLo
         }
       });
       
-      // Delete orphan and outdated cards from Drive
-      const cardsToDelete = [...orphanCards, ...outdatedCards];
-      if (cardsToDelete.length > 0) {
-        console.log(`🗑️ Encontrados ${cardsToDelete.length} card(s) para excluir (${orphanCards.length} órfão(s), ${outdatedCards.length} desatualizado(s))...`);
-        for (const cardToDelete of cardsToDelete) {
-          try {
-            await fetch(
-              `https://www.googleapis.com/drive/v3/files/${cardToDelete.id}`,
-              {
-                method: "PATCH",
-                headers: { 
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ trashed: true }),
-              }
-            );
-            console.log(`✅ Card excluído: ${cardToDelete.name}`);
-          } catch (err) {
-            console.error(`❌ Erro ao excluir card: ${cardToDelete.name}`, err);
-          }
-        }
+      // Identificação visual de órfãos e desatualizados (sem excluir automaticamente)
+      if (orphanCards.length > 0 || outdatedCards.length > 0) {
+        console.log(`⚠️ Encontrados ${orphanCards.length} card(s) órfãos e ${outdatedCards.length} desatualizado(s).`);
+        // A exclusão automática foi removida para evitar perda acidental de arquivos.
       }
       
       const sortedItems = Array.from(itemMap.values()).sort((a, b) => b.key.localeCompare(a.key));
@@ -147,6 +145,7 @@ export const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLo
 
   useEffect(() => {
     fetchFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
   const handleGenerate = async (item: DashboardItem) => {
@@ -169,10 +168,10 @@ export const Dashboard = ({ accessToken, onLogout }: { accessToken: string; onLo
         
         if (!docResponse.ok) throw new Error("Falha ao ler Google Doc");
         
-        const doc = await docResponse.json();
-        doc.body?.content?.forEach((element: any) => {
+        const doc = (await docResponse.json()) as GoogleDoc;
+        doc.body?.content?.forEach((element) => {
           if (element.paragraph) {
-            element.paragraph.elements?.forEach((el: any) => {
+            element.paragraph.elements?.forEach((el) => {
               if (el.textRun?.content) {
                 text += el.textRun.content;
               }
